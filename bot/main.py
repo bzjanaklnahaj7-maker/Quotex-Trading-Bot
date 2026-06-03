@@ -1,14 +1,13 @@
 # main.py
-
 import time
+import random
 import logging
-
-# Import custom modules
 from .strategy import TradingStrategy
 from .risk_management import RiskManager
 from .trade_executor import TradeExecutor
+from .config import TRADE_AMOUNT, MIN_DELAY, MAX_DELAY, APP_LOCK_CODE
 
-# Configure basic logging
+# Configure Professional Logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -16,69 +15,61 @@ logging.basicConfig(
 )
 
 def main():
-    """
-    Main orchestrator that continuously:
-      1) Initializes the TradeExecutor, TradingStrategy, RiskManager
-      2) Fetches account balance & market data
-      3) Generates signals, applies risk mgmt, places trades
-      4) Sleeps for 5 minutes, then repeats
-    """
+    # --- SECURITY CHECK ---
+    # Access control for Alking App
+    secret = input("Enter Activation Code to start Alking: ")
+    if secret != APP_LOCK_CODE:
+        logging.error("Unauthorized Access! Closing app.")
+        return
 
-    logging.info("Initializing TradeExecutor...")
-    # If you want to be truly headless on a server, set headless=True
-    executor = TradeExecutor()  # by default uses non-headless in your code
-    # OR: executor = TradeExecutor(headless=True) if you’ve added that param
-
-    logging.info("Initializing TradingStrategy...")
-    strategy = TradingStrategy()  # e.g. rsi_buy=25, rsi_sell=75 if you want the stricter version
-
-    logging.info("Initializing RiskManager (2% stake, 4% profit threshold)...")
-    risk_manager = RiskManager(stake_pct=0.02, profit_pct=0.04)
+    logging.info("Initializing Alking Intelligent Terminal...")
+    executor = TradeExecutor()
+    strategy = TradingStrategy()
+    risk_manager = RiskManager()
 
     try:
         while True:
-            logging.info("===== New Cycle =====")
+            # Check Session Limits (8 Wins or 2 Losses)
+            if risk_manager.should_stop():
+                logging.info("Session Target Met. Shutting down for safety.")
+                break
 
-            # 1) Get account balance
-            account_balance = executor.get_account_balance()
-            logging.info(f"Account Balance: {account_balance:.2f}")
+            logging.info("===== Scanning Market for Opportunities =====")
 
-            # 2) Determine stake size (e.g., 2% of current balance)
-            trade_amount = risk_manager.check_position_size(account_balance)
-            logging.info(f"Trade Amount: {trade_amount:.2f}")
+            # 1) Sync Account Balance
+            current_balance = executor.get_account_balance()
+            logging.info(f"Current Balance: ${current_balance}")
 
-            # 3) Fetch or mock market data
+            # 2) Fetch Live Market Data (Online Sync)
             market_data = executor.fetch_market_data()
-            logging.info(f"Fetched market data: {market_data}")
-
-            # 4) Generate signal from the strategy
+            
+            # 3) Generate Analysis Signal (RSI + Bollinger)
             signal = strategy.generate_signal(market_data)
-            logging.info(f"Strategy Signal: {signal}")
+            logging.info(f"Signal Result: {signal}")
 
-            # 5) Place a trade if signal is BUY or SELL
-            if signal == "BUY":
-                executor.set_investment_amount(trade_amount)
-                # Optionally set expiry time, e.g. executor.set_trade_time("00:01:00")
-                executor.place_trade("UP")
-                logging.info("Placed an UP (BUY) trade.")
-            elif signal == "SELL":
-                executor.set_investment_amount(trade_amount)
-                # Optionally set expiry time, e.g. executor.set_trade_time("00:01:00")
-                executor.place_trade("DOWN")
-                logging.info("Placed a DOWN (SELL) trade.")
+            # 4) Execute Logic with Session Tracking
+            if signal in ["BUY", "SELL"]:
+                # Execute Trade
+                executor.execute_trade(direction=signal, amount=TRADE_AMOUNT)
+                
+                # Update Risk Manager (This part will be synced with win/loss detection)
+                # For now, it logs the attempt and prepares for next cycle
+                logging.info(f"Trade {signal} executed. Initiating Human-Like Delay...")
+                
+                # 5) Human-Like Delay (3 to 5 minutes randomized)
+                wait_time = random.randint(MIN_DELAY, MAX_DELAY)
+                logging.info(f"Stealth Mode: Waiting {wait_time // 60} minutes before next scan.")
+                time.sleep(wait_time)
             else:
-                logging.info("No trade this cycle (signal is HOLD or unrecognized).")
+                logging.info("No strong confluence found. Waiting 60 seconds for next candle...")
+                time.sleep(60)
 
-            # 6) Sleep 5 minutes (300 seconds)
-            logging.info("Cycle complete. Sleeping 5 minutes...")
-            time.sleep(5 * 60)
-
-    except KeyboardInterrupt:
-        logging.info("Keyboard interrupt received; shutting down gracefully.")
+    except Exception as e:
+        logging.error(f"System Error: {e}")
 
     finally:
-        logging.info("Closing the Selenium driver...")
-        executor.close()
+        logging.info("Alking Terminal Closing. Protecting your data...")
+        executor.driver.quit()
 
 if __name__ == "__main__":
     main()
